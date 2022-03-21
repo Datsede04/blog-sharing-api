@@ -7,6 +7,7 @@ import { CreateArticleDto } from './dto/createArticle.dto';
 import { ArticleResponeInterface } from './types/articleResponese.interface';
 import slugify from 'slugify';
 import { ArticlesResponeInterface } from './types/articlesRespone.Interface';
+import { FollowEntity } from 'src/profile/follow.entity';
 
 @Injectable()
 export class ArticleService {
@@ -16,6 +17,9 @@ export class ArticleService {
 
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+
+    @InjectRepository(FollowEntity)
+    private readonly followRepository: Repository<FollowEntity>,
   ) {}
   async createArticle(
     currentUser: UserEntity,
@@ -32,8 +36,39 @@ export class ArticleService {
     return await this.articleRepository.save(article);
   }
 
-  buildArticleResponse(article: ArticleEntity): ArticleResponeInterface {
-    return { article };
+  async getFeed(
+    currentUserId: number,
+    query: any,
+  ): Promise<ArticlesResponeInterface> {
+    const follows = await this.followRepository.find({
+      followerId: currentUserId,
+    });
+
+    if (follows.length === 0) {
+      return { articles: [], articlesCount: 0 };
+    }
+
+    const followingUserIds = follows.map((follow) => follow.followeingId);
+    const queryBuilder = getRepository(ArticleEntity)
+      .createQueryBuilder('articles')
+      .leftJoinAndSelect('articles.author', 'author')
+      .where('articles.authorId IN (:...ids)', { ids: followingUserIds });
+
+    queryBuilder.orderBy('articles.createdAt', 'DESC');
+
+    const articlesCount = await queryBuilder.getCount();
+
+    if (query.limit) {
+      queryBuilder.limit(query.limit);
+    }
+
+    if (query.offset) {
+      queryBuilder.offset(query.offset);
+    }
+
+    const articles = await queryBuilder.getMany();
+
+    return await { articles, articlesCount };
   }
 
   private getSlug(title: string): string {
@@ -199,5 +234,9 @@ export class ArticleService {
       await this.articleRepository.save(article);
     }
     return article;
+  }
+
+  buildArticleResponse(article: ArticleEntity): ArticleResponeInterface {
+    return { article };
   }
 }

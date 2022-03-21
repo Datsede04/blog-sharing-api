@@ -11,6 +11,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { query } from 'express';
 import { User } from 'src/user/decorators/user.decorator';
 import { AuthGuard } from 'src/user/guards/auth.guard';
 import { UserEntity } from 'src/user/user.entity';
@@ -30,6 +31,15 @@ export class ArticleController {
     @Query() query: any,
   ): Promise<ArticlesResponeInterface> {
     return await this.articleService.findAll(currentUserID, query);
+  }
+
+  @Get('feed')
+  @UseGuards(AuthGuard)
+  async getFeed(
+    @User('id') currentUserId: number,
+    @Query() query: any,
+  ): Promise<ArticlesResponeInterface> {
+    return this.articleService.getFeed(currentUserId, query);
   }
 
   @Post()
